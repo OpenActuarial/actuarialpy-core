@@ -37,9 +37,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/actuarialpy/actuarialpy"
-Repository = "https://github.com/actuarialpy/actuarialpy"
-Issues = "https://github.com/actuarialpy/actuarialpy/issues"
+Homepage = "https://github.com/actuarialpy/actuarialpy-core"
+Repository = "https://github.com/actuarialpy/actuarialpy-core"
+Issues = "https://github.com/actuarialpy/actuarialpy-core/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["actuarialpy"]
