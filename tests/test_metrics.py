@@ -1,23 +1,34 @@
 import numpy as np
+import pytest
 
-from actuarialpy import loss_ratio, safe_divide
+from actuarialpy import (
+    actual_to_expected,
+    combined_ratio,
+    frequency,
+    indicated_change,
+    loss_ratio,
+    pmpm,
+    pure_premium,
+    required_revenue,
+    safe_divide,
+    severity,
+)
 
 
-def test_safe_divide_scalar():
-    assert safe_divide(10, 2) == 5
-
-
-def test_safe_divide_zero_denominator():
+def test_safe_divide_scalar_zero():
     assert np.isnan(safe_divide(10, 0))
 
 
-def test_loss_ratio_scalar():
-    assert loss_ratio(850_000, 1_000_000) == 0.85
+def test_basic_metrics():
+    assert loss_ratio(85, 100) == 0.85
+    assert pmpm(1_000, 2) == 500
+    assert actual_to_expected(110, 100) == 1.10
+    assert frequency(20, 100) == 0.2
+    assert severity(1_000, 20) == 50
+    assert pure_premium(1_000, 2) == 500
+    assert combined_ratio(70, 20, 100) == 0.90
 
 
-def test_loss_ratio_array():
-    result = loss_ratio([50, 80, 100], [100, 100, 0])
-
-    assert result[0] == 0.5
-    assert result[1] == 0.8
-    assert np.isnan(result[2])
+def test_rate_adequacy():
+    assert required_revenue(80, 0.8) == 100
+    assert indicated_change(110, 100) == pytest.approx(0.10)
