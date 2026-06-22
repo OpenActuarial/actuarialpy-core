@@ -237,6 +237,29 @@ drivers = component_driver_analysis(
 
 The output shows prior PMPM, current PMPM, PMPM change, component trend, and contribution to the total PMPM change.
 
+## Credibility
+
+ActuarialPy provides the credibility-weighting primitive plus greatest-accuracy
+(Bühlmann and Bühlmann-Straub) credibility models. These models were previously
+part of `lossmodels` and were moved here, where credibility sits next to the
+experience and ratemaking workflows that consume it.
+
+```python
+from actuarialpy import Buhlmann, credibility_weighted_estimate
+
+# Fit a Bühlmann model from a (n_risks, n_obs) array of observations.
+model = Buhlmann.fit(observations)
+model.z          # credibility factor Z = n / (n + K)
+model.premium(risk_mean)   # Z * risk_mean + (1 - Z) * overall_mean
+
+# The blend is also available directly, for a Z from any source
+# (a model above, a filed credibility formula, or your own calculation).
+credibility_weighted_estimate(observed=actual_pmpm, complement=manual_pmpm, z=0.6)
+```
+
+`BuhlmannStraub` is the exposure-weighted analogue, with `z(weight)` and
+`premium(risk_mean, weight)` taking per-risk exposure weights.
+
 ## Development status
 
 ActuarialPy is in early development. The current focus is reliable core

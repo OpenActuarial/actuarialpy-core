@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+
+- **Credibility module** (`actuarialpy.credibility`), exposed at the top level.
+  - `Buhlmann` and `BuhlmannStraub` greatest-accuracy credibility models —
+    **moved from the `lossmodels` package** (their behavior is unchanged; the
+    test suite is ported verbatim to confirm parity). This relocation puts
+    credibility next to the experience and ratemaking workflows that consume it,
+    and lets `lossmodels` step back from being a complete Klugman implementation
+    toward being a Klugman-anchored loss-distribution toolkit.
+  - `credibility_weighted_estimate(observed, complement, z)` — the type-stable
+    credibility-weighting primitive (scalar → float, Series → Series, array →
+    ndarray), for blending an experience estimate with its complement at a `Z`
+    from any source.
+
 ## 0.5.0
 
 Corrections and consistency pass. Two items change output and are called out as

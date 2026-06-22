@@ -44,6 +44,11 @@ from actuarialpy.contribution import (
     share_of_total,
     top_contributors,
 )
+from actuarialpy.credibility import (
+    Buhlmann,
+    BuhlmannStraub,
+    credibility_weighted_estimate,
+)
 from actuarialpy.experience import (
     status_summary,
     summarize_experience,
@@ -136,6 +141,10 @@ __all__ = [
     "share_of_total",
     "summarize_components",
     "top_contributors",
+    # credibility
+    "Buhlmann",
+    "BuhlmannStraub",
+    "credibility_weighted_estimate",
     # rolling
     "rolling_summary",
     # cohorts
@@ -170,4 +179,4 @@ __all__ = [
     "to_excel_report",
 ]
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
