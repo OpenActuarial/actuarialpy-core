@@ -505,6 +505,32 @@ cost"; the additive `util_effect` / `cost_effect` give the same split in dollars
 sum exactly to the PMPM change. `util_per_1000` is annualized claims per 1,000
 members (pass `annualization=1` if exposure is already in member-years).
 
+**Adding a mix term (`mix_by`).** Pass `mix_by` to split PMPM three ways —
+utilization × unit cost × **mix** — when your book is a blend of cells whose
+composition is shifting. The two-way above is an exact identity, so a book-wide
+utilization or unit-cost trend silently absorbs membership-mix shifts: when enrollment
+tilts toward a higher-cost segment, both look like inflation even when nothing inside
+any segment changed. `mix_by` measures utilization and unit cost *within* each cell and
+reports the composition shift as its own term.
+
+```python
+trend = decompose_pmpm_trend(
+    prior_year, current_year,
+    count_col="claim_count", loss_col="claims", exposure_col="member_months",
+    mix_by="segment",        # the cell dimension whose weights can shift
+)
+# pmpm_trend == util_trend * cost_trend * mix_trend (exact), and
+# pmpm_change == util_effect + cost_effect + mix_effect (exact, LMDI dollars)
+```
+
+The split uses LMDI (logarithmic mean Divisia index), which is order-free and leaves no
+residual. `mix_by` takes a column or a list — a list defines the cells as their cross
+(one blended mix term, not a per-column attribution; for separate attribution, run it
+once per dimension). `on` and `mix_by` are orthogonal: `on` groups the output rows,
+`mix_by` defines the mix cells within each group. Every cell must have positive count,
+loss, and exposure in both periods. See
+[`examples/trend_decomposition.py`](examples/trend_decomposition.py).
+
 ## Seasonality and working-day adjustment
 
 Two months of claims are rarely comparable as-is. They differ for reasons that have

@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.27.0
+
+Extends `decompose_pmpm_trend` with an optional `mix_by`, adding a third **mix**
+component to the PMPM split: utilization × unit cost × mix. The two-way split is an
+exact identity, so book-wide utilization and unit-cost trends silently absorb shifts in
+membership composition; `mix_by` measures utilization and unit cost *within* each cell
+and reports the composition shift as its own term. Omitting `mix_by` is unchanged --
+the existing two-way behaviour is byte-for-byte preserved. The library measures the
+decomposition; it does not decide which cells define the mix.
+
+### Added
+
+- `mix_by` parameter on `decompose_pmpm_trend` (a column or list of columns). When
+  given, PMPM is decomposed three ways via LMDI (logarithmic mean Divisia index), which
+  is order-free and leaves no residual: `pmpm_trend == util_trend * cost_trend *
+  mix_trend` and `pmpm_change == util_effect + cost_effect + mix_effect`, both exact.
+  Output gains `mix_trend` and `mix_effect`; utilization and unit cost are then measured
+  within cell rather than book-wide.
+- A list in `mix_by` defines the cells as their cross -- one blended mix term, not a
+  per-dimension attribution (for that, run the decomposition once per dimension). `on`
+  and `mix_by` are orthogonal: `on` groups the output rows, `mix_by` defines the mix
+  cells within each group.
+- Every mix cell must have positive count, loss, and exposure in both periods (the
+  within-cell multiplicative split is undefined otherwise); a clear `ValueError` names
+  the offending cells, with guidance to combine sparse cells or filter entrants/exits.
+
+### Examples
+
+- New `trend_decomposition.py`: the two-way split, the three-way `mix_by=` split with
+  exact multiplicative and dollar reconciliation, mix over a single dimension vs the
+  cross of two (showing the cross is not the sum of the marginals), and `on=` + `mix_by=`
+  together. Backed by a new deterministic `sample_trend_cells()` generator (segment ×
+  region cells with uniform within-cell trend and an enrollment shift toward the High
+  segment).
+
+### Tests
+
+- 12 new tests in `test_decomposition.py`: exact multiplicative and additive
+  reconciliation (including on 25 random books), the worked-example values, two-way
+  preserved when `mix_by` is omitted, pure-mix isolation, single-cell mix → 1.0 matching
+  the two-way factors, the list/cross behaviour and cross ≠ sum of marginals, `on=` +
+  `mix_by=` composition, and the positive-cells guard. Full suite: 246 passing.
+
 ## 0.26.0
 
 Adds `fit_trend` -- developing a trend from history by log-linear regression, the

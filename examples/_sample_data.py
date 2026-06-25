@@ -182,3 +182,39 @@ if __name__ == "__main__":  # quick smoke check
     panel = sample_seasonal_panel()
     print("seasonal panel:", panel.shape, "| months:", panel["month"].nunique(),
           "| segments:", panel.groupby(["line_of_business", "product"]).ngroups)
+
+
+def sample_trend_cells() -> pd.DataFrame:
+    """Two-period claims panel by morbidity segment and region, for trend decomposition.
+
+    A deterministic prior/current snapshot (labelled 2024 and 2025) split into
+    segment (Low/High morbidity) x region (North/South) cells -- a clean member-level
+    partition, so member months add up across cells without double counting. Within
+    every cell utilization trends +3% and unit cost +4% (uniform, so the "true"
+    within-cell trends are obvious); meanwhile enrollment shifts toward the High
+    segment, so the book-wide two-way overstates utilization and unit cost while the
+    mix term recovers the difference. Columns: ``period``, ``segment``, ``region``,
+    ``member_months``, ``claim_count``, ``allowed``.
+    """
+    prior = {                                  # (segment, region): (member_months, utilization, unit_cost)
+        ("Low", "North"): (40000, 0.45, 420.0),
+        ("Low", "South"): (24000, 0.45, 440.0),
+        ("High", "North"): (20000, 0.95, 820.0),
+        ("High", "South"): (16000, 0.95, 860.0),
+    }
+    current_mm = {                             # enrollment tilts toward High (and slightly South)
+        ("Low", "North"): 33000,
+        ("Low", "South"): 22000,
+        ("High", "North"): 24000,
+        ("High", "South"): 21000,
+    }
+    util_trend, cost_trend = 1.03, 1.04        # uniform within every cell
+    rows: list[dict] = []
+    for (seg, reg), (mm0, u0, c0) in prior.items():
+        rows.append({"period": "2024", "segment": seg, "region": reg, "member_months": float(mm0),
+                     "claim_count": u0 * mm0, "allowed": c0 * u0 * mm0})
+        mm1 = current_mm[(seg, reg)]
+        u1, c1 = u0 * util_trend, c0 * cost_trend
+        rows.append({"period": "2025", "segment": seg, "region": reg, "member_months": float(mm1),
+                     "claim_count": u1 * mm1, "allowed": c1 * u1 * mm1})
+    return pd.DataFrame(rows)
