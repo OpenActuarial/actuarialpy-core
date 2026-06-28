@@ -1,4 +1,4 @@
-# ActuarialPy
+# actuarialpy
 
 Standard actuarial analyses on claims, eligibility, and premium data: loss ratios and PMPM,
 development triangles and IBNR, trend, credibility, seasonality, and utilization/unit-cost
@@ -21,11 +21,11 @@ and `pandas`, and every result is a DataFrame or Series.
 - [Credibility](#credibility)
 - [Lifecycle, pooling, banding, margins](#lifecycle-pooling-banding-margins)
 - [Reporting](#reporting)
-- [The ActuarialPy ecosystem](#the-actuarialpy-ecosystem)
+- [The OpenActuarial ecosystem](#the-openactuarial-ecosystem)
 
 ## Overview
 
-ActuarialPy is a calculation library for loss ratios, per-exposure rates, chain-ladder
+`actuarialpy` is a calculation library for loss ratios, per-exposure rates, chain-ladder
 development, credibility, seasonal factors, and the LMDI trend decomposition, applied to
 claims, eligibility, and premium data. It does not perform data preparation or encode filed
 methodology: the caller supplies the table and selects the method.
@@ -404,9 +404,9 @@ views = exp.views({"overall": None, "by_group": "group_id"})
 to_excel_report(views, "experience_report.xlsx")
 ```
 
-## The ActuarialPy ecosystem
+## The OpenActuarial ecosystem
 
-ActuarialPy is the experience-and-data layer of a set of actuarial packages. It is standalone
+`actuarialpy` is the experience-and-data layer of a set of actuarial packages. It is standalone
 (only `numpy` and `pandas`). Three companion packages cover distributional and simulation
 methods and interoperate through a `.sample()` / `.mean()` interface:
 
