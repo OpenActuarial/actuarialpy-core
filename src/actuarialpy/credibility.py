@@ -242,67 +242,176 @@ class BuhlmannStraub:
         premium = z * risk_mean + (1.0 - z) * self.overall_mean
         return float(premium) if np.ndim(premium) == 0 else premium
 
+    @staticmethod
+    def _to_risk_lists(data: Any, weights: Any):
+        """Normalize ``(data, weights)`` into lists of 1D arrays, one per risk.
+
+        Accepts a 2D array (equal period counts) or a sequence of 1D arrays per
+        risk (unequal period counts), validating shapes and positive weights.
+        """
+        arr: Any
+        try:
+            arr = np.asarray(data, dtype=float)
+        except (ValueError, TypeError):
+            arr = None
+        if isinstance(arr, np.ndarray) and arr.ndim == 2:
+            warr = np.asarray(weights, dtype=float)
+            if warr.ndim != 2:
+                raise ValueError("weights must be a 2D array when data is 2D.")
+            if arr.shape != warr.shape:
+                raise ValueError("data and weights must have the same shape.")
+            if arr.shape[0] < 2:
+                raise ValueError("data must contain at least two risks.")
+            if arr.shape[1] < 2:
+                raise ValueError("each risk must have at least two periods.")
+            obs = [arr[i] for i in range(arr.shape[0])]
+            wts = [warr[i] for i in range(warr.shape[0])]
+        else:
+            obs = [np.asarray(x, dtype=float) for x in data]
+            wts = [np.asarray(w, dtype=float) for w in weights]
+            if len(obs) != len(wts):
+                raise ValueError("data and weights must have the same number of risks.")
+            if len(obs) < 2:
+                raise ValueError("data must contain at least two risks.")
+            for x, w in zip(obs, wts):
+                if x.ndim != 1 or w.ndim != 1:
+                    raise ValueError("each risk's data and weights must be 1D.")
+                if x.shape != w.shape:
+                    raise ValueError("each risk's data and weights must have the same length.")
+                if x.size < 2:
+                    raise ValueError("each risk must have at least two periods.")
+        allw = np.concatenate([np.ravel(w) for w in wts])
+        if np.any(allw <= 0):
+            raise ValueError("weights must be positive.")
+        return obs, wts
+
+    @staticmethod
+    def _estimate(risk_obs, risk_wts):
+        r"""General Bühlmann-Straub estimators on per-risk observation/weight lists.
+
+        For risks :math:`i` with observations :math:`X_{ij}` and weights
+        :math:`w_{ij}`, with :math:`m_i = \sum_j w_{ij}`,
+        :math:`\bar X_i = \sum_j w_{ij} X_{ij} / m_i`, :math:`m = \sum_i m_i`,
+        and :math:`\bar X = \sum_i m_i \bar X_i / m`:
+
+        .. math::
+            \hat s^2 = \frac{\sum_i \sum_j w_{ij}(X_{ij}-\bar X_i)^2}{\sum_i (n_i-1)},
+            \qquad
+            \hat a = \frac{\sum_i m_i(\bar X_i-\bar X)^2 - (r-1)\hat s^2}
+                          {m - \sum_i m_i^2 / m}.
+
+        Handles unequal :math:`n_i`; :math:`\hat a` is floored at 0 (no credibility).
+        Returns ``(overall_mean, epv, vhm, m_i, xbar_i)``.
+        """
+        r = len(risk_obs)
+        if r < 2:
+            raise ValueError("need at least two risks.")
+        m_i = np.array([float(w.sum()) for w in risk_wts])
+        xbar_i = np.array(
+            [float(np.sum(w * x) / w.sum()) for x, w in zip(risk_obs, risk_wts)]
+        )
+        m = float(m_i.sum())
+        overall_mean = float(np.sum(m_i * xbar_i) / m)
+
+        ss_within = float(
+            sum(np.sum(w * (x - xb) ** 2) for x, w, xb in zip(risk_obs, risk_wts, xbar_i))
+        )
+        dof = int(sum(len(x) - 1 for x in risk_obs))
+        if dof <= 0:
+            raise ValueError("need at least one risk with more than one observation.")
+        epv = ss_within / dof
+
+        between = float(np.sum(m_i * (xbar_i - overall_mean) ** 2))
+        denom = m - float(np.sum(m_i**2)) / m
+        vhm = max((between - (r - 1) * epv) / denom, 0.0) if denom > 0 else 0.0
+        return overall_mean, epv, vhm, m_i, xbar_i
+
     @classmethod
     def fit(cls, data: Any, weights: Any) -> BuhlmannStraub:
-        """Fit a Bühlmann-Straub model from observations and weights.
+        r"""Fit a Bühlmann-Straub model from observations and weights.
+
+        Accepts either a 2D array (equal period counts) or a sequence of 1D
+        arrays per risk (unequal period counts). The estimators are the general
+        unbiased forms
+
+        .. math::
+            \hat s^2 = \frac{\sum_i\sum_j w_{ij}(X_{ij}-\bar X_i)^2}{\sum_i(n_i-1)},
+            \quad
+            \hat a = \frac{\sum_i m_i(\bar X_i-\bar X)^2 - (r-1)\hat s^2}
+                          {m - \sum_i m_i^2/m},
+
+        with :math:`k=\hat s^2/\hat a` and :math:`Z_i=m_i/(m_i+k)`; a negative
+        :math:`\hat a` is floored at 0. For equal period counts this reduces to
+        the usual estimator; unlike a divide-by-mean-weight approximation it stays
+        unbiased when risks have different period counts or exposures.
 
         Parameters
         ----------
-        data : array-like, shape (m, n)
-            Observed values X_ij for m risks and n periods.
-        weights : array-like, shape (m, n)
-            Exposure weights w_ij for m risks and n periods.
+        data : array-like
+            Either shape ``(r, n)`` (equal periods) or a sequence of ``r`` 1D
+            arrays ``X_i`` whose lengths may differ.
+        weights : array-like
+            Exposure weights matching the shape/structure of ``data``.
+        """
+        risk_obs, risk_wts = cls._to_risk_lists(data, weights)
+        overall_mean, epv, vhm, m_i, xbar_i = cls._estimate(risk_obs, risk_wts)
+        model = cls(overall_mean=overall_mean, epv=epv, vhm=vhm, weights=m_i)
+        model.groups_ = None
+        model.risk_means_ = xbar_i
+        return model
+
+    @classmethod
+    def from_frame(
+        cls,
+        df,
+        *,
+        group: str,
+        value: str,
+        weight: str,
+        period: str | None = None,
+    ) -> BuhlmannStraub:
+        """Fit from long-format data: one row per (risk, period).
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Long-format observations.
+        group, value, weight : str
+            Column names for the risk identifier, the per-unit observation (e.g.
+            loss per member-month), and the exposure weight.
+        period : str, optional
+            Period column; used only to order observations within a risk. The
+            number of observations per risk may differ.
 
         Returns
         -------
         BuhlmannStraub
-            Fitted Bühlmann-Straub model.
-
-        Notes
-        -----
-        Let ``w_i. = sum_j w_ij``, ``Xbar_i = sum_j w_ij X_ij / w_i.``, and
-        ``overall_mean = sum_i sum_j w_ij X_ij / sum_i sum_j w_ij``.
-
-        EPV is estimated by ``[sum_i sum_j w_ij (X_ij - Xbar_i)^2] / [m (n - 1)]``.
-
-        VHM is the weighted sample variance of the risk means around the overall
-        mean, adjusted by EPV and floored at 0. This is a practical
-        implementation intended for equal period counts.
+            Fitted model with ``groups_`` (risk labels), ``risk_means_``, and
+            ``weights`` (per-risk total exposure), all aligned to ``groups_``.
         """
-        data = np.asarray(data, dtype=float)
-        weights = np.asarray(weights, dtype=float)
-
-        if data.ndim != 2:
-            raise ValueError("data must be a 2D array.")
-        if weights.ndim != 2:
-            raise ValueError("weights must be a 2D array.")
-        if data.shape != weights.shape:
-            raise ValueError("data and weights must have the same shape.")
-        if data.shape[0] < 2:
-            raise ValueError("data must contain at least two risks.")
-        if data.shape[1] < 2:
-            raise ValueError("each risk must have at least two periods.")
-        if np.any(weights <= 0):
+        required = [group, value, weight] + ([period] if period else [])
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            raise KeyError(f"columns not found in df: {missing}")
+        work = df[required].copy()
+        work[value] = work[value].astype(float)
+        work[weight] = work[weight].astype(float)
+        if np.any(work[weight].to_numpy() <= 0):
             raise ValueError("weights must be positive.")
 
-        m, n = data.shape
+        risk_obs, risk_wts, labels = [], [], []
+        for label, g in work.groupby(group, sort=True):
+            if period is not None:
+                g = g.sort_values(period)
+            risk_obs.append(g[value].to_numpy(dtype=float))
+            risk_wts.append(g[weight].to_numpy(dtype=float))
+            labels.append(label)
 
-        risk_weights = np.sum(weights, axis=1)
-        weighted_risk_means = np.sum(weights * data, axis=1) / risk_weights
-
-        overall_mean = float(np.sum(weights * data) / np.sum(weights))
-
-        ss_within = np.sum(weights * (data - weighted_risk_means[:, None]) ** 2)
-        epv = float(ss_within / (m * (n - 1)))
-
-        mean_risk_weight = float(np.mean(risk_weights))
-        between_term = float(
-            np.sum(risk_weights * (weighted_risk_means - overall_mean) ** 2) / (m - 1)
-        )
-
-        vhm = max((between_term - epv) / mean_risk_weight, 0.0)
-
-        return cls(overall_mean=overall_mean, epv=epv, vhm=vhm, weights=risk_weights)
+        overall_mean, epv, vhm, m_i, xbar_i = cls._estimate(risk_obs, risk_wts)
+        model = cls(overall_mean=overall_mean, epv=epv, vhm=vhm, weights=m_i)
+        model.groups_ = pd.Index(labels, name=group)
+        model.risk_means_ = xbar_i
+        return model
 
     def __repr__(self) -> str:
         return (

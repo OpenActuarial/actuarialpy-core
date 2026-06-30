@@ -219,3 +219,82 @@ def test_bs_repr():
     text = repr(BuhlmannStraub(overall_mean=10.0, epv=4.0, vhm=2.0, weights=[3.0, 5.0]))
     assert "BuhlmannStraub" in text
     assert "overall_mean=10.0" in text
+
+
+# --------------------------------------------------------------------------- #
+# BuhlmannStraub — general estimator (unequal period counts) and from_frame
+# --------------------------------------------------------------------------- #
+def test_bs_fit_general_estimator_exact_unequal_periods():
+    # Risk A: 2 obs, Risk B: 3 obs (ragged) -- the old equal-only fit could not
+    # take this shape. Values hand-computed from the general estimators.
+    risk_a = np.array([10.0, 12.0])
+    risk_b = np.array([20.0, 22.0, 24.0])
+    w_a = np.array([1.0, 1.0])
+    w_b = np.array([1.0, 1.0, 1.0])
+    model = BuhlmannStraub.fit([risk_a, risk_b], [w_a, w_b])
+
+    # m_A=2, X̄_A=11; m_B=3, X̄_B=22; m=5; X̄=88/5=17.6
+    assert model.overall_mean == pytest.approx(17.6)
+    assert np.allclose(model.weights, [2.0, 3.0])
+    # EPV = (2 + 8) / ((2-1)+(3-1)) = 10/3
+    assert model.epv == pytest.approx(10.0 / 3.0)
+    # between = 2*6.6^2 + 3*4.4^2 = 145.2 ; denom = 5 - 13/5 = 2.4
+    # VHM = (145.2 - 1*10/3) / 2.4
+    assert model.vhm == pytest.approx((145.2 - 10.0 / 3.0) / 2.4)
+    # more exposure -> more credibility
+    z = model.z(model.weights)
+    assert z[1] > z[0]
+
+
+def test_bs_fit_ragged_requires_two_obs_per_risk():
+    with pytest.raises(ValueError):
+        BuhlmannStraub.fit([np.array([10.0]), np.array([20.0, 22.0])],
+                           [np.array([1.0]), np.array([1.0, 1.0])])
+
+
+def test_bs_from_frame_matches_ragged_fit():
+    df = pd.DataFrame({
+        "group": ["A", "A", "B", "B", "B"],
+        "period": [1, 2, 1, 2, 3],
+        "loss": [10.0, 12.0, 20.0, 22.0, 24.0],
+        "exposure": [1.0, 1.0, 1.0, 1.0, 1.0],
+    })
+    model = BuhlmannStraub.from_frame(df, group="group", value="loss",
+                                      weight="exposure", period="period")
+    ref = BuhlmannStraub.fit([np.array([10.0, 12.0]), np.array([20.0, 22.0, 24.0])],
+                             [np.array([1.0, 1.0]), np.array([1.0, 1.0, 1.0])])
+    assert model.overall_mean == pytest.approx(ref.overall_mean)
+    assert model.epv == pytest.approx(ref.epv)
+    assert model.vhm == pytest.approx(ref.vhm)
+    assert list(model.groups_) == ["A", "B"]
+    assert np.allclose(model.risk_means_, [11.0, 22.0])
+    assert np.allclose(model.weights, [2.0, 3.0])
+
+
+def test_bs_from_frame_exposure_weighted_means():
+    df = pd.DataFrame({
+        "group": ["A", "A", "B", "B"],
+        "loss": [100.0, 200.0, 300.0, 300.0],
+        "exposure": [3.0, 1.0, 1.0, 1.0],
+    })
+    model = BuhlmannStraub.from_frame(df, group="group", value="loss", weight="exposure")
+    # X̄_A = (3*100 + 1*200)/4 = 125 ; X̄_B = 300
+    assert np.allclose(model.risk_means_, [125.0, 300.0])
+
+
+def test_bs_from_frame_no_signal_floors_vhm():
+    # identical group means -> VHM floored to 0 -> zero credibility
+    df = pd.DataFrame({
+        "group": ["A", "A", "B", "B", "C", "C"],
+        "loss": [100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
+        "exposure": [1.0, 2.0, 1.0, 1.0, 2.0, 1.0],
+    })
+    model = BuhlmannStraub.from_frame(df, group="group", value="loss", weight="exposure")
+    assert model.vhm == 0.0
+    assert np.allclose(model.z(model.weights), 0.0)
+
+
+def test_bs_from_frame_missing_column_raises():
+    df = pd.DataFrame({"group": ["A", "B"], "loss": [1.0, 2.0]})
+    with pytest.raises(KeyError):
+        BuhlmannStraub.from_frame(df, group="group", value="loss", weight="exposure")
