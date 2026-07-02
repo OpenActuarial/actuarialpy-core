@@ -33,8 +33,8 @@ def test_summarize_experience_health_profile():
     assert ppo["total_expense"] == 330
     assert ppo["total_revenue"] == 600
     assert ppo["mlr"] == 0.55
-    assert ppo["expense_pmpm"] == 55
-    assert ppo["revenue_pmpm"] == 100
+    assert ppo["total_expense_per_member_months"] == 55
+    assert ppo["total_revenue_per_member_months"] == 100
 
 
 def test_custom_summary_labels():
@@ -67,7 +67,7 @@ def test_components():
     result = summarize_components(sample_df(), groupby="product", component_cols=["inpatient", "outpatient"], exposure_col="member_months")
     ppo = result[result["product"] == "PPO"].iloc[0]
     assert ppo["total_expense"] == 330
-    assert ppo["inpatient_pmpm"] == 25
+    assert ppo["inpatient_per_member_months"] == 25
     assert ppo["inpatient_share"] == pytest.approx(150 / 330)
 
 

@@ -54,7 +54,7 @@ def test_actual_vs_expected_free_function_and_facade():
         expected_cols="expected_claims",
         exposure_cols="member_months",
     )
-    assert set(["actual", "expected", "actual_to_expected", "variance", "actual_pmpm"]).issubset(free.columns)
+    assert set(["actual", "expected", "actual_to_expected", "variance", "actual_per_member_months"]).issubset(free.columns)
 
     exp = ap.Experience(df, expense="claims", revenue="premium", exposure="member_months", date="incurred_date")
     facade = exp.actual_vs_expected(expected="expected_claims", groupby="product_code")

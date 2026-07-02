@@ -6,19 +6,9 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from actuarialpy.columns import as_list, validate_columns
+from actuarialpy.columns import as_list, per_exposure_name, validate_columns
 from actuarialpy.metrics import per_exposure, safe_divide
 from actuarialpy.trend import _comparison_masks
-
-
-def _per_exposure_name(component: str, exposure_col: str) -> str:
-    if exposure_col == "member_months":
-        return f"{component}_pmpm"
-    if exposure_col == "subscriber_months":
-        return f"{component}_pspm"
-    if exposure_col == "employee_months":
-        return f"{component}_pepm"
-    return f"{component}_per_{exposure_col}"
 
 
 def summarize_components(
@@ -45,8 +35,8 @@ def summarize_components(
     summary[total_col] = summary[components].sum(axis=1)
     if exposure_col:
         for component in components:
-            summary[_per_exposure_name(component, exposure_col)] = per_exposure(summary[component], summary[exposure_col])
-        summary[_per_exposure_name(total_col, exposure_col)] = per_exposure(summary[total_col], summary[exposure_col])
+            summary[per_exposure_name(component, exposure_col)] = per_exposure(summary[component], summary[exposure_col])
+        summary[per_exposure_name(total_col, exposure_col)] = per_exposure(summary[total_col], summary[exposure_col])
     if include_shares:
         for component in components:
             summary[f"{component}_share"] = safe_divide(summary[component], summary[total_col])
@@ -128,7 +118,7 @@ def component_driver_analysis(
         changes = {}
         total_change = 0
         for comp in components:
-            metric = _per_exposure_name(comp, exposure_col) if exposure_col else comp
+            metric = per_exposure_name(comp, exposure_col) if exposure_col else comp
             prior_val = row.get(f"{metric}_prior", 0)
             current_val = row.get(f"{metric}_current", 0)
             prior_val = 0 if pd.isna(prior_val) else prior_val
@@ -137,7 +127,7 @@ def component_driver_analysis(
             total_change += changes[comp]
 
         for comp in components:
-            metric = _per_exposure_name(comp, exposure_col) if exposure_col else comp
+            metric = per_exposure_name(comp, exposure_col) if exposure_col else comp
             prior_val = row.get(f"{metric}_prior", 0)
             current_val = row.get(f"{metric}_current", 0)
             prior_val = 0 if pd.isna(prior_val) else prior_val

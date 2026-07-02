@@ -6,18 +6,9 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from actuarialpy.columns import as_list, validate_columns
+from actuarialpy.columns import as_list, per_exposure_name, validate_columns
 from actuarialpy.experience import summarize_experience
 from actuarialpy.metrics import loss_ratio, per_exposure
-
-
-def _per_exposure_column_names(exposure: str) -> tuple[str, str]:
-    mapping = {
-        "member_months": ("expense_pmpm", "revenue_pmpm"),
-        "subscriber_months": ("expense_pspm", "revenue_pspm"),
-        "employee_months": ("expense_pepm", "revenue_pepm"),
-    }
-    return mapping.get(exposure, (f"total_expense_per_{exposure}", f"total_revenue_per_{exposure}"))
 
 
 def rolling_summary(
@@ -80,7 +71,8 @@ def rolling_summary(
             out[col] = rolled[col].values
         out[ratio_col] = loss_ratio(out["total_expense"], out["total_revenue"])
         for exposure in exposures:
-            expense_per, revenue_per = _per_exposure_column_names(exposure)
+            expense_per = per_exposure_name("total_expense", exposure)
+            revenue_per = per_exposure_name("total_revenue", exposure)
             out[expense_per] = per_exposure(out["total_expense"], out[exposure])
             out[revenue_per] = per_exposure(out["total_revenue"], out[exposure])
 

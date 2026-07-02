@@ -12,10 +12,10 @@ from actuarialpy.trend import _inverse_normal_cdf, _student_t_ppf
 def _series(annual_trend, months=36, start="2022-01-01", noise=None, seed=0):
     dates = pd.date_range(start, periods=months, freq="MS")
     t = np.asarray((dates - dates[0]).days) / 365.25
-    pmpm = 300.0 * (1.0 + annual_trend) ** t
+    cost = 300.0 * (1.0 + annual_trend) ** t
     if noise:
-        pmpm = pmpm * np.random.default_rng(seed).normal(1.0, noise, months)
-    return pd.DataFrame({"month": dates, "claims": pmpm * 1000.0, "mm": 1000.0}), t
+        cost = cost * np.random.default_rng(seed).normal(1.0, noise, months)
+    return pd.DataFrame({"month": dates, "claims": cost * 1000.0, "mm": 1000.0}), t
 
 
 def test_recovers_known_trend_exactly_without_noise():
@@ -36,11 +36,11 @@ def test_confidence_interval_contains_truth_under_noise():
 
 def test_robust_to_outlier_endpoint_where_two_point_is_not():
     df, _ = _series(0.072)
-    pmpm = np.array(df["claims"] / df["mm"], dtype="float64")
-    pmpm[-1] *= 1.25  # a spike in the latest month
-    spiked = df.assign(claims=pmpm * df["mm"])
+    cost = np.array(df["claims"] / df["mm"], dtype="float64")
+    cost[-1] *= 1.25  # a spike in the latest month
+    spiked = df.assign(claims=cost * df["mm"])
     fit = fit_trend(spiked, value_col="claims", date_col="month", exposure_col="mm")
-    two_point = annualized_trend(pmpm[-1], pmpm[0], months_between=len(pmpm) - 1)
+    two_point = annualized_trend(cost[-1], cost[0], months_between=len(cost) - 1)
     # the regression barely moves; the two-point CAGR is thrown right off
     assert abs(fit.annual_trend - 0.072) < abs(two_point - 0.072)
     assert abs(fit.annual_trend - 0.072) < 0.02
@@ -50,8 +50,8 @@ def test_fits_the_rate_not_the_level():
     # claims grow from both PMPM trend and membership growth; only the PMPM trend is fitted
     df, t = _series(0.072)
     members = 1000.0 * (1.02) ** t
-    pmpm = (df["claims"] / df["mm"]).to_numpy()
-    grown = pd.DataFrame({"month": df["month"], "claims": pmpm * members, "mm": members})
+    cost = (df["claims"] / df["mm"]).to_numpy()
+    grown = pd.DataFrame({"month": df["month"], "claims": cost * members, "mm": members})
     fit = fit_trend(grown, value_col="claims", date_col="month", exposure_col="mm")
     assert abs(fit.annual_trend - 0.072) < 1e-6
 

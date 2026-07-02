@@ -141,3 +141,13 @@ def is_date_like(series: pd.Series, name: str) -> bool:
     if lowered in _DATE_NAME_TOKENS:
         return True
     return any(lowered.startswith(tok + "_") or lowered.endswith("_" + tok) for tok in _DATE_AFFIX_TOKENS)
+
+
+def per_exposure_name(stem: str, exposure_col: str) -> str:
+    """Output column name for a per-exposure quantity: ``{stem}_per_{exposure_col}``.
+
+    Naming is mechanical and domain-free. Domain conventions (a health shop's
+    ``_pmpm``) belong to the caller and are applied via the ``labels`` /
+    ``profile`` options on the output views, never inferred from column names.
+    """
+    return f"{stem}_per_{exposure_col}"

@@ -38,17 +38,17 @@ def test_exposure_sits_between_groups_and_amounts():
     assert cols.index("segment") < cols.index("member_months")
 
 
-def test_each_amount_next_to_its_pmpm():
+def test_each_amount_next_to_its_per_member_months():
     cols = list(_ave().columns)
-    assert _adjacent(cols, "actual", "actual_pmpm")
-    assert _adjacent(cols, "expected", "expected_pmpm")
+    assert _adjacent(cols, "actual", "actual_per_member_months")
+    assert _adjacent(cols, "expected", "expected_per_member_months")
 
 
 def test_variance_family_grouped_on_the_right():
     cols = list(_ave().columns)
-    # variance, variance_pmpm, variance_pct contiguous, after the expected block
-    assert _adjacent(cols, "variance", "variance_pmpm")
-    assert _adjacent(cols, "variance_pmpm", "variance_pct")
+    # variance, variance_per_member_months, variance_pct contiguous, after the expected block
+    assert _adjacent(cols, "variance", "variance_per_member_months")
+    assert _adjacent(cols, "variance_per_member_months", "variance_pct")
     assert cols.index("variance") > cols.index("expected")
 
 
@@ -61,9 +61,9 @@ def test_components_precede_their_totals():
     assert cols.index("actual_claims") < cols.index("actual")
 
 
-def test_no_exposure_drops_pmpm_keeps_order():
+def test_no_exposure_drops_per_exposure_keeps_order():
     cols = list(_ave(exposure_cols=None).columns)
-    assert not any("pmpm" in c for c in cols)
+    assert not any("_per_" in c for c in cols)
     assert cols.index("variance") < cols.index("variance_pct") < cols.index("actual_to_expected")
     assert cols[-1] == "actual_to_expected"
 
@@ -71,7 +71,7 @@ def test_no_exposure_drops_pmpm_keeps_order():
 def test_custom_names_are_ordered_too():
     cols = list(_ave(actual_name="paid", expected_name="forecast",
                      variance_name="diff", ae_name="paid_to_forecast").columns)
-    assert _adjacent(cols, "paid", "paid_pmpm")
-    assert _adjacent(cols, "forecast", "forecast_pmpm")
+    assert _adjacent(cols, "paid", "paid_per_member_months")
+    assert _adjacent(cols, "forecast", "forecast_per_member_months")
     assert cols[-1] == "paid_to_forecast"
     assert cols.index("diff") < cols.index("paid_to_forecast")

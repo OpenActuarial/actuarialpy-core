@@ -22,10 +22,10 @@ def _book(start="2019-01-01", end="2024-12-01", trend=1.004, growth=1.003, base=
           mm0=10000, season=_TRUE):
     months = pd.date_range(start, end, freq="MS")
     t = np.arange(len(months))
-    pmpm = base * (trend ** t) * season[months.month.values - 1]
+    cost = base * (trend ** t) * season[months.month.values - 1]
     members = (mm0 * (growth ** t)).round()
     return pd.DataFrame(
-        {"month": months, "claims": pmpm * members, "member_months": members, "pmpm": pmpm}
+        {"month": months, "claims": cost * members, "member_months": members, "cost": cost}
     )
 
 
@@ -88,17 +88,17 @@ def test_factors_normalized_to_mean_one():
 def test_deseasonalize_then_reseasonalize_roundtrip():
     df = _book()
     f = seasonality_factors(df, date_col="month", value_col="claims", exposure_col="member_months")
-    ds = deseasonalize(df, f, date_col="month", value_col="pmpm")
-    rs = apply_seasonality(ds, f, date_col="month", value_col="pmpm_deseasonalized", out_col="roundtrip")
-    assert np.allclose(rs["roundtrip"].values, df["pmpm"].values)
+    ds = deseasonalize(df, f, date_col="month", value_col="cost")
+    rs = apply_seasonality(ds, f, date_col="month", value_col="cost_deseasonalized", out_col="roundtrip")
+    assert np.allclose(rs["roundtrip"].values, df["cost"].values)
 
 
 def test_deseasonalize_flattens_to_smooth_trend():
     df = _book()
     f = seasonality_factors(df, date_col="month", value_col="claims", exposure_col="member_months")
-    ds = deseasonalize(df, f, date_col="month", value_col="pmpm")
+    ds = deseasonalize(df, f, date_col="month", value_col="cost")
     t = np.arange(len(df))
-    detrended = ds["pmpm_deseasonalized"].values / (350.0 * (1.004 ** t))
+    detrended = ds["cost_deseasonalized"].values / (350.0 * (1.004 ** t))
     assert np.std(detrended) < 0.01  # seasonality removed -> only smooth trend remains
 
 
@@ -261,9 +261,9 @@ def _two_lob_seasonal():
         m = pd.date_range("2021-01-01", "2024-12-01", freq="MS")
         t = np.arange(len(m))
         mm = (8000 * 1.003 ** t).round()
-        pmpm = 300 * 1.004 ** t * s[m.month.values - 1]
+        cost = 300 * 1.004 ** t * s[m.month.values - 1]
         for i in range(len(m)):
-            rows.append({"lob": lob, "month": m[i], "claims": round(pmpm[i] * mm[i], 2), "member_months": mm[i]})
+            rows.append({"lob": lob, "month": m[i], "claims": round(cost[i] * mm[i], 2), "member_months": mm[i]})
     return pd.DataFrame(rows)
 
 

@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 import actuarialpy as ap
-from actuarialpy import decompose_pmpm_trend, fit_trend, frequency_severity_summary
+from actuarialpy import decompose_per_exposure_trend, fit_trend, frequency_severity_summary
 
 
 def _panel():
@@ -62,19 +62,19 @@ def test_frequency_severity_matches_free_function():
 def test_decompose_trend_period_mode_matches_free_and_reconciles():
     df = _panel()
     fac = _exp(df).decompose_trend(period_col="year", prior_period=2024, current_period=2025, mix_by="segment")
-    free = decompose_pmpm_trend(df[df["year"] == 2024], df[df["year"] == 2025],
+    free = decompose_per_exposure_trend(df[df["year"] == 2024], df[df["year"] == 2025],
                                 count_col="claim_count", loss_col="allowed",
                                 exposure_col="member_months", mix_by="segment")
     pd.testing.assert_frame_equal(fac, free)
     r = fac.iloc[0]
-    assert r["util_trend"] * r["cost_trend"] * r["mix_trend"] == pytest.approx(r["pmpm_trend"])
+    assert r["util_trend"] * r["cost_trend"] * r["mix_trend"] == pytest.approx(r["loss_per_exposure_trend"])
 
 
 def test_decompose_trend_two_way_without_mix():
     fac = _exp().decompose_trend(period_col="year", prior_period=2024, current_period=2025)
     assert "mix_trend" not in fac.columns
     r = fac.iloc[0]
-    assert r["util_trend"] * r["cost_trend"] == pytest.approx(r["pmpm_trend"])
+    assert r["util_trend"] * r["cost_trend"] == pytest.approx(r["loss_per_exposure_trend"])
 
 
 def test_decompose_trend_uses_bound_date_with_ranges():
@@ -85,7 +85,7 @@ def test_decompose_trend_uses_bound_date_with_ranges():
     )
     pri = df[(df["date"] >= "2024-01-01") & (df["date"] <= "2024-12-31")]
     cur = df[(df["date"] >= "2025-01-01") & (df["date"] <= "2025-12-31")]
-    free = decompose_pmpm_trend(pri, cur, count_col="claim_count", loss_col="allowed",
+    free = decompose_per_exposure_trend(pri, cur, count_col="claim_count", loss_col="allowed",
                                 exposure_col="member_months", mix_by="segment")
     pd.testing.assert_frame_equal(fac, free)
 
@@ -95,7 +95,7 @@ def test_decompose_trend_on_groups_one_row_per_group():
                                  mix_by="segment", groupby="region")
     assert set(out["region"]) == {"North", "South"}
     for _, r in out.iterrows():
-        assert r["util_trend"] * r["cost_trend"] * r["mix_trend"] == pytest.approx(r["pmpm_trend"])
+        assert r["util_trend"] * r["cost_trend"] * r["mix_trend"] == pytest.approx(r["loss_per_exposure_trend"])
 
 
 def test_decompose_trend_on_and_mix_by_must_differ():
@@ -124,5 +124,5 @@ def test_count_survives_filter_and_with_roles():
     filtered = _exp().filter(query="segment == 'Low'")
     assert filtered.count == "claim_count"
     out = filtered.frequency_severity()
-    assert out["pmpm"].iloc[0] == pytest.approx(out["frequency"].iloc[0] * out["severity"].iloc[0])
+    assert out["loss_per_exposure"].iloc[0] == pytest.approx(out["frequency"].iloc[0] * out["severity"].iloc[0])
     assert _exp(count=None).with_roles(count="claim_count").count == "claim_count"

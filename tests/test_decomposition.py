@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from actuarialpy import decompose_pmpm_trend, frequency_severity_summary
+from actuarialpy import decompose_per_exposure_trend, frequency_severity_summary
 
 
 def _book(freq_per_mm, sev, mm=1000, n_months=12, **extra):
@@ -23,40 +23,36 @@ def _fs(df, **kw):
 
 
 def _dec(prior, current, **kw):
-    return decompose_pmpm_trend(prior, current, count_col="claim_count", loss_col="claims",
+    return decompose_per_exposure_trend(prior, current, count_col="claim_count", loss_col="claims",
                                 exposure_col="member_months", **kw)
 
 
-def test_pmpm_equals_frequency_times_severity():
+def test_loss_per_exposure_equals_frequency_times_severity():
     row = _fs(_book(0.40, 250.0)).iloc[0]
-    assert row["pmpm"] == pytest.approx(row["frequency"] * row["severity"])
-    assert row["pmpm"] == pytest.approx(100.0)
+    assert row["loss_per_exposure"] == pytest.approx(row["frequency"] * row["severity"])
+    assert row["loss_per_exposure"] == pytest.approx(100.0)
 
-
-def test_util_per_1000_annualized():
-    row = _fs(_book(0.40, 250.0)).iloc[0]
-    assert row["util_per_1000"] == pytest.approx(row["frequency"] * 12 * 1000)
 
 
 def test_summary_groupby():
     df = pd.concat([_book(0.40, 250.0, plan="A"), _book(0.30, 300.0, plan="B")], ignore_index=True)
     out = _fs(df, groupby="plan")
     assert sorted(out["plan"]) == ["A", "B"]
-    assert (out["pmpm"] == out["frequency"] * out["severity"]).all()
+    assert (out["loss_per_exposure"] == out["frequency"] * out["severity"]).all()
 
 
 def test_multiplicative_decomposition_exact():
     d = _dec(_book(0.40, 250.0), _book(0.42, 262.5)).iloc[0]
-    assert d["util_trend"] * d["cost_trend"] == pytest.approx(d["pmpm_trend"])
+    assert d["util_trend"] * d["cost_trend"] == pytest.approx(d["loss_per_exposure_trend"])
     assert d["util_trend"] == pytest.approx(1.05)
     assert d["cost_trend"] == pytest.approx(1.05)
-    assert d["pmpm_trend"] == pytest.approx(1.1025)
+    assert d["loss_per_exposure_trend"] == pytest.approx(1.1025)
 
 
 def test_additive_decomposition_exact():
     d = _dec(_book(0.40, 250.0), _book(0.42, 262.5)).iloc[0]
-    assert d["util_effect"] + d["cost_effect"] == pytest.approx(d["pmpm_change"])
-    assert d["pmpm_change"] == pytest.approx(10.25)
+    assert d["util_effect"] + d["cost_effect"] == pytest.approx(d["loss_per_exposure_change"])
+    assert d["loss_per_exposure_change"] == pytest.approx(10.25)
 
 
 def test_pure_utilization_change():
@@ -79,12 +75,12 @@ def test_decompose_grouped_outer_join():
     out = _dec(pri, cur, on="plan")
     assert set(out["plan"]) == {"A", "B", "C"}   # outer join keeps one-sided plans
     a = out[out["plan"] == "A"].iloc[0]
-    assert a["pmpm_trend"] == pytest.approx(1.1025)
+    assert a["loss_per_exposure_trend"] == pytest.approx(1.1025)
 
 
-def test_output_leads_with_pmpm_and_trends():
+def test_output_leads_with_loss_per_exposure_and_trends():
     cols = list(_dec(_book(0.40, 250.0), _book(0.42, 262.5)).columns)
-    assert cols[:5] == ["pmpm_prior", "pmpm_current", "pmpm_trend", "util_trend", "cost_trend"]
+    assert cols[:5] == ["loss_per_exposure_prior", "loss_per_exposure_current", "loss_per_exposure_trend", "util_trend", "cost_trend"]
 
 
 # --- three-way (utilization x unit cost x mix) via mix_by -------------------
@@ -97,11 +93,11 @@ def _cells(spec):
 
 
 def _mix(prior, current, **kw):
-    return decompose_pmpm_trend(prior, current, count_col="claim_count", loss_col="claims",
+    return decompose_per_exposure_trend(prior, current, count_col="claim_count", loss_col="claims",
                                 exposure_col="member_months", mix_by="cell", **kw)
 
 
-# the worked example: util ~+5.0%, unit cost ~+4.6%, mix ~+8.8%, pmpm ~+19.5%
+# the worked example: util ~+5.0%, unit cost ~+4.6%, mix ~+8.8%, per-exposure ~+19.5%
 _PRIOR = _cells({"Healthy": (70000.0, 28000.0, 14_000_000.0),
                  "Chronic": (30000.0, 24000.0, 21_600_000.0)})
 _CURR = _cells({"Healthy": (64000.0, 26880.0, 13_977_600.0),
@@ -110,12 +106,12 @@ _CURR = _cells({"Healthy": (64000.0, 26880.0, 13_977_600.0),
 
 def test_three_way_multiplicative_reconciles():
     d = _mix(_PRIOR, _CURR).iloc[0]
-    assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["pmpm_trend"])
+    assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["loss_per_exposure_trend"])
 
 
 def test_three_way_additive_reconciles():
     d = _mix(_PRIOR, _CURR).iloc[0]
-    assert d["util_effect"] + d["cost_effect"] + d["mix_effect"] == pytest.approx(d["pmpm_change"])
+    assert d["util_effect"] + d["cost_effect"] + d["mix_effect"] == pytest.approx(d["loss_per_exposure_change"])
 
 
 def test_three_way_known_values():
@@ -123,7 +119,7 @@ def test_three_way_known_values():
     assert d["util_trend"] == pytest.approx(1.0499, abs=1e-3)
     assert d["cost_trend"] == pytest.approx(1.0463, abs=1e-3)
     assert d["mix_trend"] == pytest.approx(1.0881, abs=1e-3)
-    assert d["pmpm_trend"] == pytest.approx(1.19535, abs=1e-4)
+    assert d["loss_per_exposure_trend"] == pytest.approx(1.19535, abs=1e-4)
 
 
 def test_mix_by_none_is_two_way_unchanged():
@@ -131,14 +127,14 @@ def test_mix_by_none_is_two_way_unchanged():
     assert "mix_trend" not in two.columns          # no third component
     assert "mix_effect" not in two.columns
     row = two.iloc[0]
-    assert row["util_trend"] * row["cost_trend"] == pytest.approx(row["pmpm_trend"])
+    assert row["util_trend"] * row["cost_trend"] == pytest.approx(row["loss_per_exposure_trend"])
 
 
 def test_three_way_differs_from_book_wide_two_way():
     # the whole point: the 2-way blames util/cost for the population shift
     two = _dec(_PRIOR, _CURR).iloc[0]
     three = _mix(_PRIOR, _CURR).iloc[0]
-    assert two["pmpm_trend"] == pytest.approx(three["pmpm_trend"])      # same total
+    assert two["loss_per_exposure_trend"] == pytest.approx(three["loss_per_exposure_trend"])      # same total
     assert two["util_trend"] > three["util_trend"] + 0.03              # book-wide util overstated
     assert two["cost_trend"] > three["cost_trend"] + 0.03              # book-wide cost overstated
 
@@ -152,7 +148,7 @@ def test_pure_mix_shift_isolated():
     d = _mix(prior, current).iloc[0]
     assert d["util_trend"] == pytest.approx(1.0)
     assert d["cost_trend"] == pytest.approx(1.0)
-    assert d["mix_trend"] == pytest.approx(d["pmpm_trend"])            # all trend is mix
+    assert d["mix_trend"] == pytest.approx(d["loss_per_exposure_trend"])            # all trend is mix
     assert d["util_effect"] == pytest.approx(0.0, abs=1e-9)
     assert d["cost_effect"] == pytest.approx(0.0, abs=1e-9)
 
@@ -185,17 +181,17 @@ _PA_CURR = _pa({("A", "Y"): 0.25, ("A", "O"): 0.15, ("B", "Y"): 0.25, ("B", "O")
 
 
 def _padec(mix_by, **kw):
-    return decompose_pmpm_trend(_PA_PRIOR, _PA_CURR, count_col="claim_count", loss_col="claims",
+    return decompose_per_exposure_trend(_PA_PRIOR, _PA_CURR, count_col="claim_count", loss_col="claims",
                                 exposure_col="member_months", mix_by=mix_by, **kw)
 
 
 def test_mix_by_list_cross_reconciles_and_captures_all_composition():
     d = _padec(["product", "age"]).iloc[0]
-    assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["pmpm_trend"])
+    assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["loss_per_exposure_trend"])
     # within-cell util & cost are fixed in the fixture -> all movement is mix
     assert d["util_trend"] == pytest.approx(1.0)
     assert d["cost_trend"] == pytest.approx(1.0)
-    assert d["mix_trend"] == pytest.approx(d["pmpm_trend"])
+    assert d["mix_trend"] == pytest.approx(d["loss_per_exposure_trend"])
 
 
 def test_cross_mix_is_not_sum_of_marginal_mixes():
@@ -207,18 +203,18 @@ def test_cross_mix_is_not_sum_of_marginal_mixes():
     # but each single-dimension run still reconciles
     for one in ("product", "age"):
         d = _padec(one).iloc[0]
-        assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["pmpm_trend"])
+        assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["loss_per_exposure_trend"])
 
 
 def test_on_and_mix_by_compose():
     # report by line of business (on), measure mix across product within each line
     pri = pd.concat([_PRIOR.assign(lob="IP"), _PRIOR.assign(lob="OP")], ignore_index=True)
     cur = pd.concat([_CURR.assign(lob="IP"), _CURR.assign(lob="OP")], ignore_index=True)
-    out = decompose_pmpm_trend(pri, cur, count_col="claim_count", loss_col="claims",
+    out = decompose_per_exposure_trend(pri, cur, count_col="claim_count", loss_col="claims",
                                exposure_col="member_months", on="lob", mix_by="cell")
     assert set(out["lob"]) == {"IP", "OP"}
     for _, r in out.iterrows():
-        assert r["util_trend"] * r["cost_trend"] * r["mix_trend"] == pytest.approx(r["pmpm_trend"])
+        assert r["util_trend"] * r["cost_trend"] * r["mix_trend"] == pytest.approx(r["loss_per_exposure_trend"])
 
 
 def test_mix_by_requires_positive_cells():
@@ -240,5 +236,5 @@ def test_three_way_reconciles_on_random_books():
             return pd.DataFrame(dict(cell=[f"c{i}" for i in range(k)],
                                      member_months=mm, claim_count=n, claims=cost * n))
         d = _mix(period(), period()).iloc[0]
-        assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["pmpm_trend"])
-        assert d["util_effect"] + d["cost_effect"] + d["mix_effect"] == pytest.approx(d["pmpm_change"])
+        assert d["util_trend"] * d["cost_trend"] * d["mix_trend"] == pytest.approx(d["loss_per_exposure_trend"])
+        assert d["util_effect"] + d["cost_effect"] + d["mix_effect"] == pytest.approx(d["loss_per_exposure_change"])

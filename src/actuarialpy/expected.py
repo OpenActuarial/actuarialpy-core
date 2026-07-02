@@ -6,18 +6,8 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from actuarialpy.columns import as_list, is_date_like, sum_columns, validate_columns
+from actuarialpy.columns import as_list, is_date_like, per_exposure_name, sum_columns, validate_columns
 from actuarialpy.metrics import actual_to_expected as actual_to_expected_ratio, per_exposure, safe_divide
-
-
-def _per_exposure_name(prefix: str, exposure_col: str) -> str:
-    if exposure_col == "member_months":
-        return f"{prefix}_pmpm"
-    if exposure_col == "subscriber_months":
-        return f"{prefix}_pspm"
-    if exposure_col == "employee_months":
-        return f"{prefix}_pepm"
-    return f"{prefix}_per_{exposure_col}"
 
 
 def _order_ave_columns(
@@ -45,9 +35,9 @@ def _order_ave_columns(
     """
     date_groups = [g for g in groups if is_date_like(out[g], g)]
     other_groups = [g for g in groups if g not in date_groups]
-    actual_rates = [_per_exposure_name(actual_name, e) for e in exposures]
-    expected_rates = [_per_exposure_name(expected_name, e) for e in exposures]
-    variance_rates = [_per_exposure_name(variance_name, e) for e in exposures]
+    actual_rates = [per_exposure_name(actual_name, e) for e in exposures]
+    expected_rates = [per_exposure_name(expected_name, e) for e in exposures]
+    variance_rates = [per_exposure_name(variance_name, e) for e in exposures]
     actual_block = list(actuals) + [actual_name] + actual_rates
     expected_block = list(expecteds) + [expected_name] + expected_rates
     variance_block = [variance_name] + variance_rates + [variance_pct_name]
@@ -107,9 +97,9 @@ def summarize_actual_vs_expected(
     out[variance_pct_name] = safe_divide(out[variance_name], out[expected_name])
 
     for exposure in exposures:
-        out[_per_exposure_name(actual_name, exposure)] = per_exposure(out[actual_name], out[exposure])
-        out[_per_exposure_name(expected_name, exposure)] = per_exposure(out[expected_name], out[exposure])
-        out[_per_exposure_name(variance_name, exposure)] = per_exposure(out[variance_name], out[exposure])
+        out[per_exposure_name(actual_name, exposure)] = per_exposure(out[actual_name], out[exposure])
+        out[per_exposure_name(expected_name, exposure)] = per_exposure(out[expected_name], out[exposure])
+        out[per_exposure_name(variance_name, exposure)] = per_exposure(out[variance_name], out[exposure])
 
     return _order_ave_columns(
         out,

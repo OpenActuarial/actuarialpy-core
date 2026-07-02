@@ -14,7 +14,7 @@ and `pandas`, and every result is a DataFrame or Series.
 - [Ratios and per-exposure metrics](#ratios-and-per-exposure-metrics)
 - [Reserving](#reserving)
 - [Trend and forecasting](#trend-and-forecasting)
-- [Utilization and PMPM decomposition](#utilization-and-pmpm-decomposition)
+- [Frequency-severity and per-exposure decomposition](#frequency-severity-and-per-exposure-decomposition)
 - [Seasonality and working days](#seasonality-and-working-days)
 - [Adjustments and restatement](#adjustments-and-restatement)
 - [Actual versus forecast](#actual-versus-forecast)
@@ -32,8 +32,8 @@ methodology: the caller supplies the table and selects the method.
 
 There are two interfaces:
 
-- **Free functions** — `loss_ratio`, `pmpm`, `severity`, `trend_factor`, `fit_trend`,
-  `seasonality_factors`, `decompose_pmpm_trend`, the credibility models, and others. Each
+- **Free functions** — `loss_ratio`, `per_exposure`, `severity`, `trend_factor`, `fit_trend`,
+  `seasonality_factors`, `decompose_per_exposure_trend`, the credibility models, and others. Each
   accepts scalars, NumPy arrays, or pandas Series and returns the same type. They operate on
   any frame at any grain.
 - **The `Experience` object** — binds the column roles (expense, revenue, exposure, date)
@@ -124,13 +124,11 @@ NaN rather than raising on a zero denominator):
 | Function | Definition |
 | --- | --- |
 | `loss_ratio(losses, revenue)` | losses ÷ revenue |
-| `medical_loss_ratio(claims, premium)` | claims ÷ premium |
 | `expense_ratio(expenses, revenue)` | expenses ÷ revenue |
 | `combined_ratio(losses, expenses, revenue)` | (losses + expenses) ÷ revenue |
 | `pure_premium(losses, exposure)` | losses ÷ exposure |
 | `frequency(claim_count, exposure)` | claims ÷ exposure |
 | `severity(losses, claim_count)` | losses ÷ claim count |
-| `pmpm` / `pspm` / `pepm(amount, months)` | per-member / -subscriber / -employee per month |
 | `per_exposure(amount, exposure)` | generic per-exposure rate |
 | `permissible_loss_ratio(expense_ratio, profit_provision)` | 1 − expense ratio − profit |
 | `required_revenue(expense, target_ratio)` | expense ÷ target ratio |
@@ -231,31 +229,31 @@ completed, deseasonalized history (`complete` → `deseasonalize` → `fit_trend
 seasonality do not bias the slope. Rate-based projection is in the forecast module:
 `forecast_experience(...)` applies a trended per-exposure rate to projected exposure.
 
-## Utilization and PMPM decomposition
+## Frequency-severity and per-exposure decomposition
 
-Split a per-member cost into utilization and unit cost, and decompose the change between two
+Split a per-exposure loss into utilization and unit cost, and decompose the change between two
 periods into utilization and unit-cost effects. It requires a claim or service count
 alongside losses and exposure:
 
 ```python
-from actuarialpy import frequency_severity_summary, decompose_pmpm_trend
+from actuarialpy import frequency_severity_summary, decompose_per_exposure_trend
 
 panel = frequency_severity_summary(
     df, count_col="claim_count", loss_col="claims", exposure_col="member_months",
     groupby="plan",
 )
-# columns: plan, member_months, claim_count, claims, frequency, severity, util_per_1000, pmpm
-# pmpm == frequency * severity for every row
+# columns: plan, member_months, claim_count, claims, frequency, severity, loss_per_exposure
+# loss_per_exposure == frequency * severity for every row
 
-trend = decompose_pmpm_trend(
+trend = decompose_per_exposure_trend(
     prior_year, current_year,
     count_col="claim_count", loss_col="claims", exposure_col="member_months",
     on="plan",            # optional; omit for a single total row
 )
-# pmpm_trend == util_trend * cost_trend (exact); pmpm_change == util_effect + cost_effect
+# loss_per_exposure_trend == util_trend * cost_trend (exact); loss_per_exposure_change == util_effect + cost_effect
 ```
 
-Pass `mix_by` to split PMPM into utilization, unit cost, and mix when the book is a blend of
+Pass `mix_by` to split the per-exposure trend into utilization, unit cost, and mix when the book is a blend of
 cells whose composition changes between periods; otherwise a book-wide utilization or cost
 trend absorbs membership-mix shifts. The split uses LMDI (logarithmic mean Divisia index),
 which is order-independent and leaves no residual. Every cell must have positive count, loss,
@@ -396,28 +394,33 @@ directly when EPV and VHM are already known.
 ## Underwriting summary and weighted rollups
 
 The two-tier underwriting income statement — **gross margin** (revenue less
-benefit expense, admin excluded, which is also why admin never enters an MLR)
-and **gain/(loss)** (gross margin less admin). Ratio denominators are explicit
-parameters because real exhibits mix them (MCR over net revenue, AER over
-gross premium); `reconciliation()` reports the resulting gap in
-`gain% = 1 − MCR − AER` so the convention is visible instead of silent. These
-are management/pricing metrics; the regulated ACA rebate MLR is out of scope.
+loss expense, operating expense excluded, which is also why operating expense
+never enters a loss ratio) and **gain/(loss)** (gross margin less operating
+expense). Ratio denominators are explicit parameters because real exhibits mix
+them (a loss ratio over net revenue beside an expense ratio over gross
+premium); `reconciliation()` reports the resulting gap in
+`gain% = 1 − combined ratio` so the convention is visible instead of silent.
+Domain naming flows through `profile` / `labels` on the output views (a health
+shop's `mlr`), never the calculation. These are management/pricing metrics;
+regulated ratio calculations (e.g. a statutory rebate loss ratio) are out of
+scope.
 
 ```python
 from actuarialpy import UnderwritingSummary, underwriting_summary
 
-uw = UnderwritingSummary.from_pmpm(
-    revenue_pmpm={"premium": 400.0, "refund": -1.4},
-    benefit_pmpm={"medical": 340.0, "pharmacy_net": 16.4},
-    admin_pmpm=37.4,
-    member_months=300_000,
+uw = UnderwritingSummary.from_per_exposure(
+    revenue_per_exposure={"premium": 400.0, "refund": -1.4},
+    loss_per_exposure={"claims": 340.0, "other_loss": 16.4},
+    expense_per_exposure=37.4,
+    exposure=300_000,
 )
-uw.mcr, uw.aer, uw.gross_margin_pmpm, uw.gain_pmpm, uw.gain_ratio
+uw.loss_ratio, uw.expense_ratio, uw.combined_ratio, uw.gain_per_exposure
+uw.to_frame(profile="health")   # loss_ratio -> mlr; math unchanged
 
 # grouped: components summed first, every ratio a ratio of sums
 underwriting_summary(df, groupby="cohort",
-                     revenue_cols=["premium", "refund"], benefit_cols=medical_cols,
-                     admin_cols="admin", exposure_col="member_months",
+                     revenue_cols=["premium", "refund"], loss_cols=claim_cols,
+                     expense_cols="expense", exposure_col="member_months",
                      premium_col="premium")
 ```
 

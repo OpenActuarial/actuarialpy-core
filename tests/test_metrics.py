@@ -7,7 +7,6 @@ from actuarialpy import (
     frequency,
     indicated_change,
     loss_ratio,
-    pmpm,
     pure_premium,
     required_revenue,
     safe_divide,
@@ -21,7 +20,6 @@ def test_safe_divide_scalar_zero():
 
 def test_basic_metrics():
     assert loss_ratio(85, 100) == 0.85
-    assert pmpm(1_000, 2) == 500
     assert actual_to_expected(110, 100) == 1.10
     assert frequency(20, 100) == 0.2
     assert severity(1_000, 20) == 50

@@ -54,11 +54,6 @@ def loss_ratio(losses_or_expenses: Any, revenue: Any) -> Any:
     return ratio(losses_or_expenses, revenue)
 
 
-def medical_loss_ratio(claims: Any, premium: Any) -> Any:
-    """Calculate a medical loss ratio: claims divided by premium."""
-    return loss_ratio(claims, premium)
-
-
 def expense_ratio(expenses: Any, revenue: Any) -> Any:
     """Calculate an expense ratio: expenses divided by revenue."""
     return ratio(expenses, revenue)
@@ -81,21 +76,6 @@ def per_exposure(amount: Any, exposure: Any) -> Any:
     return ratio(amount, exposure)
 
 
-def pmpm(amount: Any, member_months: Any) -> Any:
-    """Calculate amount per member month."""
-    return per_exposure(amount, member_months)
-
-
-def pspm(amount: Any, subscriber_months: Any) -> Any:
-    """Calculate amount per subscriber month."""
-    return per_exposure(amount, subscriber_months)
-
-
-def pepm(amount: Any, employee_months: Any) -> Any:
-    """Calculate amount per employee month."""
-    return per_exposure(amount, employee_months)
-
-
 def frequency(claim_count: Any, exposure: Any) -> Any:
     """Calculate claim frequency: claim count divided by exposure."""
     return ratio(claim_count, exposure)
@@ -109,17 +89,6 @@ def severity(losses: Any, claim_count: Any) -> Any:
 def pure_premium(losses: Any, exposure: Any) -> Any:
     """Calculate pure premium: losses divided by exposure."""
     return per_exposure(losses, exposure)
-
-
-def utilization_per_1000(claim_count: Any, exposure: Any, *, annualization: float = 12) -> Any:
-    """Annualized utilization per 1,000 members.
-
-    Returns ``claim_count / exposure * annualization * 1000``. With monthly member
-    months as ``exposure`` the default ``annualization=12`` yields services (admits,
-    visits, scripts, ...) per 1,000 members per year. If ``exposure`` is already in
-    member-years, pass ``annualization=1``.
-    """
-    return ratio(claim_count, exposure) * annualization * 1000
 
 
 def required_revenue(expense: Any, target_ratio: Any) -> Any:

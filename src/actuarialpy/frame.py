@@ -15,7 +15,7 @@ from actuarialpy.cohorts import cohort_summary, duration_summary
 from actuarialpy.columns import as_list, sum_columns, validate_columns
 from actuarialpy.components import component_driver_analysis, summarize_components
 from actuarialpy.credibility import credibility_weighted_estimate
-from actuarialpy.decomposition import decompose_pmpm_trend, frequency_severity_summary
+from actuarialpy.decomposition import decompose_per_exposure_trend, frequency_severity_summary
 from actuarialpy.expected import summarize_actual_vs_expected
 from actuarialpy.experience import status_summary, summarize_experience, summarize_views
 from actuarialpy.lifecycle import derive_status
@@ -366,12 +366,11 @@ class Experience:
         loss_col: str | None = None,
         exposure_col: str | None = None,
         groupby: str | list[str] | None = None,
-        annualization: float = 12,
     ) -> pd.DataFrame:
-        """Per-group claim frequency, severity, and PMPM (see ``frequency_severity_summary``).
+        """Per-group claim frequency, severity, and per-exposure loss (see ``frequency_severity_summary``).
 
         Uses the bound ``count``, ``expense`` (as the loss), and ``exposure`` roles, so the
-        columns are specified once on the object. The identity ``pmpm == frequency *
+        columns are specified once on the object. The identity ``loss_per_exposure == frequency *
         severity`` holds for every row.
         """
         data, resolved_loss = self._data_with_amount(loss_col)
@@ -381,7 +380,6 @@ class Experience:
             loss_col=resolved_loss,
             exposure_col=self._resolve_exposure(exposure_col),
             groupby=groupby,
-            annualization=annualization,
         )
 
     def decompose_trend(
@@ -402,15 +400,14 @@ class Experience:
         current_end: Any = None,
         prior_filter: Any = None,
         current_filter: Any = None,
-        annualization: float = 12,
     ) -> pd.DataFrame:
-        """Decompose the PMPM trend between two periods of the bound data.
+        """Decompose the per-exposure loss trend between two periods of the bound data.
 
         Splits the bound frame into prior and current with the same comparison modes as
         :meth:`trend` -- ``period_col`` with ``prior_period`` / ``current_period``, a
         ``date_col`` with prior/current ranges (the bound ``date`` is used when no
         ``date_col`` is passed), or explicit ``prior_filter`` / ``current_filter`` masks --
-        then decomposes the change via :func:`decompose_pmpm_trend`, using the bound
+        then decomposes the change via :func:`decompose_per_exposure_trend`, using the bound
         ``count``, ``expense`` (as the loss), and ``exposure`` roles. Pass ``mix_by`` to add
         the third LMDI mix term; ``groupby`` reports one decomposition per group.
         """
@@ -432,7 +429,7 @@ class Experience:
             prior_filter=prior_filter,
             current_filter=current_filter,
         )
-        return decompose_pmpm_trend(
+        return decompose_per_exposure_trend(
             data.loc[prior_mask],
             data.loc[current_mask],
             count_col=resolved_count,
@@ -440,7 +437,6 @@ class Experience:
             exposure_col=resolved_exposure,
             on=groupby,
             mix_by=mix_by,
-            annualization=annualization,
         )
 
     def fit_trend(

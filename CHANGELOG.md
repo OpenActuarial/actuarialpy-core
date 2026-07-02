@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.37.0
+
+### Removed
+
+- The domain-sugar metrics leave the core: `pmpm`, `pspm`, `pepm` (use
+  `per_exposure`), `medical_loss_ratio` (use `loss_ratio`; the `health`
+  profile labels it `mlr` on output views), and `utilization_per_1000`
+  (assumed month-based exposure and per-1,000 scaling; compute from
+  `frequency` where needed). `frequency_severity_summary` drops the
+  `util_per_1000` column and the `annualization` parameter with it.
+- The automatic `_pmpm` / `_pspm` / `_pepm` per-exposure suffixes keyed off
+  column names are removed everywhere (experience, rolling, claimants,
+  components, actual-vs-expected, underwriting). Every per-exposure output
+  is now the mechanical `{name}_per_{exposure_col}`, produced by one shared
+  `per_exposure_name` helper in `columns`; domain names are opt-in via
+  `labels` / explicit output-name parameters, never inferred from column
+  names. Per-exposure columns now also follow custom total names
+  (`claims_total` -> `claims_total_per_member_months`).
+
+### Changed
+
+- `decompose_pmpm_trend` -> `decompose_per_exposure_trend`; the summary
+  column `pmpm` and the keys `pmpm_prior` / `pmpm_current` / `pmpm_trend` /
+  `pmpm_change` become `loss_per_exposure` / `loss_per_exposure_*`. The
+  identities are unchanged: `loss_per_exposure == frequency * severity` and
+  `loss_per_exposure_trend == util_trend * cost_trend (* mix_trend)`.
+
+## 0.36.0
+
+### Changed
+
+- The underwriting module is renamed to domain-agnostic vocabulary before
+  its first release (0.35.0 was built but never published). `benefit` ->
+  `losses`, `admin` -> `expenses`, `member_months` -> `exposure`, `mcr` ->
+  `loss_ratio`, `aer` -> `expense_ratio`, `from_pmpm` ->
+  `from_per_exposure`, and every `*_pmpm` output becomes
+  `*_per_exposure`. A `combined_ratio` is added, mirroring the
+  loss/expense/combined trio in `metrics`. Domain naming now flows through
+  the profile system instead of the calculation: `to_frame`, `statement`,
+  and `underwriting_summary` accept `profile`/`labels`, renaming only the
+  loss-ratio column to the domain's ratio name (`health` -> `mlr`, `life`
+  -> `benefit_ratio`), exactly like `summarize_experience`. The grouped
+  version keeps the month-based per-exposure suffixes (`_pmpm` / `_pspm` /
+  `_pepm`) purely as sugar when the exposure column is literally named
+  `member_months` / `subscriber_months` / `employee_months`, and uses
+  `_per_{exposure_col}` otherwise -- the same convention as the experience
+  summaries.
+- `weighted` docstrings drop group-insurance phrasing; behavior unchanged.
+
 ## 0.35.0
 
 ### Added

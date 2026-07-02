@@ -1,13 +1,13 @@
-"""Frequency-severity and PMPM trend decomposition.
+"""Frequency-severity and per-exposure trend decomposition.
 
-Splits a per-member cost (PMPM / pure premium) into its utilization and unit-cost
+Splits a per-exposure loss (pure premium) into its utilization and unit-cost
 drivers, and decomposes the change between two periods into a utilization effect and
 a unit-cost effect -- the standard "how much of the trend is utilization vs unit
 cost" exhibit. Decomposing requires a claim (or service) count alongside losses and
 exposure.
 
-Passing ``mix_by`` to :func:`decompose_pmpm_trend` adds a third **mix** component
-(utilization x unit cost x mix), separating the effect of the membership composition
+Passing ``mix_by`` to :func:`decompose_per_exposure_trend` adds a third **mix** component
+(utilization x unit cost x mix), separating the effect of the exposure composition
 shifting across cells from genuine within-cell utilization and unit-cost movement.
 """
 
@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 from actuarialpy.columns import as_list, validate_columns
-from actuarialpy.metrics import frequency, per_exposure, safe_divide, severity, utilization_per_1000
+from actuarialpy.metrics import frequency, per_exposure, safe_divide, severity
 
 
 def frequency_severity_summary(
@@ -29,16 +29,14 @@ def frequency_severity_summary(
     loss_col: str,
     exposure_col: str,
     groupby: str | Iterable[str] | None = None,
-    annualization: float = 12,
 ) -> pd.DataFrame:
-    """Per-group claim frequency, severity, and PMPM.
+    """Per-group claim frequency, severity, and per-exposure loss.
 
     Counts, losses, and exposure are aggregated first, then the rates are derived
     after aggregation (avoiding averaging row-level rates). The identity
-    ``pmpm == frequency * severity`` holds for every row. ``frequency`` is claims per
-    exposure unit (per member month for monthly data), ``severity`` is loss per claim,
-    ``util_per_1000`` is annualized claims per 1,000 members, and ``pmpm`` is loss per
-    exposure unit.
+    ``loss_per_exposure == frequency * severity`` holds for every row: ``frequency`` is
+    claims per exposure unit, ``severity`` is loss per claim, and ``loss_per_exposure``
+    is loss per exposure unit (the pure premium).
     """
     groups = as_list(groupby)
     validate_columns(df, groups + [count_col, loss_col, exposure_col])
@@ -50,10 +48,9 @@ def frequency_severity_summary(
 
     summary["frequency"] = frequency(summary[count_col], summary[exposure_col])
     summary["severity"] = severity(summary[loss_col], summary[count_col])
-    summary["util_per_1000"] = utilization_per_1000(summary[count_col], summary[exposure_col], annualization=annualization)
-    summary["pmpm"] = per_exposure(summary[loss_col], summary[exposure_col])
+    summary["loss_per_exposure"] = per_exposure(summary[loss_col], summary[exposure_col])
 
-    ordered = groups + [exposure_col, count_col, loss_col, "frequency", "severity", "util_per_1000", "pmpm"]
+    ordered = groups + [exposure_col, count_col, loss_col, "frequency", "severity", "loss_per_exposure"]
     return summary[[col for col in ordered if col in summary.columns]]
 
 
@@ -86,33 +83,33 @@ def _lmdi_three_way(
 
     Each argument is an array over the mix cells: ``m`` exposure, ``n`` count, ``a``
     dollars; suffix ``0`` prior and ``1`` current. Returns the multiplicative factors
-    (``util_trend * cost_trend * mix_trend == pmpm_trend``) and the additive dollar
-    effects (``util_effect + cost_effect + mix_effect == pmpm_change``); both exact.
+    (``util_trend * cost_trend * mix_trend == loss_per_exposure_trend``) and the additive dollar
+    effects (``util_effect + cost_effect + mix_effect == loss_per_exposure_change``); both exact.
     """
     big_m0, big_m1 = m0.sum(), m1.sum()
     u0, c0, w0 = n0 / m0, a0 / n0, m0 / big_m0
     u1, c1, w1 = n1 / m1, a1 / n1, m1 / big_m1
-    v0, v1 = a0 / big_m0, a1 / big_m1            # cell contribution to group PMPM (== w*u*c)
-    p0, p1 = float(v0.sum()), float(v1.sum())    # group PMPM each period
+    v0, v1 = a0 / big_m0, a1 / big_m1            # cell contribution to group per-exposure loss (== w*u*c)
+    p0, p1 = float(v0.sum()), float(v1.sum())    # group per-exposure loss each period
     l_cell = _logarithmic_mean(v1, v0)
     l_tot = float(_logarithmic_mean(np.array([p1]), np.array([p0]))[0])
     omega = l_cell / l_tot
     ln_u, ln_c, ln_w = np.log(u1 / u0), np.log(c1 / c0), np.log(w1 / w0)
     return {
-        "pmpm_prior": p0,
-        "pmpm_current": p1,
-        "pmpm_trend": p1 / p0,
+        "loss_per_exposure_prior": p0,
+        "loss_per_exposure_current": p1,
+        "loss_per_exposure_trend": p1 / p0,
         "util_trend": float(np.exp(np.sum(omega * ln_u))),
         "cost_trend": float(np.exp(np.sum(omega * ln_c))),
         "mix_trend": float(np.exp(np.sum(omega * ln_w))),
-        "pmpm_change": p1 - p0,
+        "loss_per_exposure_change": p1 - p0,
         "util_effect": float(np.sum(l_cell * ln_u)),
         "cost_effect": float(np.sum(l_cell * ln_c)),
         "mix_effect": float(np.sum(l_cell * ln_w)),
     }
 
 
-def _decompose_pmpm_trend_mix(
+def _decompose_per_exposure_trend_mix(
     prior: pd.DataFrame,
     current: pd.DataFrame,
     *,
@@ -122,7 +119,7 @@ def _decompose_pmpm_trend_mix(
     on: list[str],
     mix_by: str | Iterable[str],
 ) -> pd.DataFrame:
-    """Three-way (utilization x unit cost x mix) PMPM decomposition via LMDI."""
+    """Three-way (utilization x unit cost x mix) per-exposure loss decomposition via LMDI."""
     mix_keys = as_list(mix_by)
     overlap = [k for k in mix_keys if k in on]
     if overlap:
@@ -151,7 +148,7 @@ def _decompose_pmpm_trend_mix(
     if bool(invalid.any()):
         shown = merged.loc[invalid, cell_keys] if cell_keys else merged.loc[invalid, period_cols]
         raise ValueError(
-            "decompose_pmpm_trend(mix_by=...) requires every mix cell to have positive "
+            "decompose_per_exposure_trend(mix_by=...) requires every mix cell to have positive "
             f"{exposure_col!r}, {count_col!r}, and {loss_col!r} in BOTH periods; the "
             "within-cell utilization x unit cost x mix split is undefined otherwise. "
             "Combine sparse cells or filter cells that enter/exit between periods. "
@@ -177,14 +174,14 @@ def _decompose_pmpm_trend_mix(
 
     out = pd.DataFrame(records)
     ordered = on + [
-        "pmpm_prior", "pmpm_current", "pmpm_trend",
+        "loss_per_exposure_prior", "loss_per_exposure_current", "loss_per_exposure_trend",
         "util_trend", "cost_trend", "mix_trend",
-        "pmpm_change", "util_effect", "cost_effect", "mix_effect",
+        "loss_per_exposure_change", "util_effect", "cost_effect", "mix_effect",
     ]
     return out[[col for col in ordered if col in out.columns]]
 
 
-def decompose_pmpm_trend(
+def decompose_per_exposure_trend(
     prior: pd.DataFrame,
     current: pd.DataFrame,
     *,
@@ -193,28 +190,27 @@ def decompose_pmpm_trend(
     exposure_col: str,
     on: str | Iterable[str] | None = None,
     mix_by: str | Iterable[str] | None = None,
-    annualization: float = 12,
 ) -> pd.DataFrame:
-    """Decompose the PMPM change from ``prior`` to ``current``.
+    """Decompose the per-exposure loss change from ``prior`` to ``current``.
 
     With ``mix_by`` omitted this is the two-way split: both frames are summarized with
     :func:`frequency_severity_summary` (optionally by the ``on`` keys), aligned, and the
     change reported two exact ways:
 
-    - **Multiplicative trend**: ``pmpm_trend == util_trend * cost_trend``, where
+    - **Multiplicative trend**: ``loss_per_exposure_trend == util_trend * cost_trend``, where
       ``util_trend`` is the frequency ratio and ``cost_trend`` the severity ratio.
-    - **Additive dollars**: ``pmpm_change == util_effect + cost_effect`` via a symmetric
-      (midpoint) split, so the contributions sum exactly to the PMPM change.
+    - **Additive dollars**: ``loss_per_exposure_change == util_effect + cost_effect`` via a symmetric
+      (midpoint) split, so the contributions sum exactly to the per-exposure change.
 
-    Pass ``mix_by`` (a column or list of columns) to add a third **mix** component. PMPM
-    is then decomposed into utilization, unit cost, and the effect of the membership
+    Pass ``mix_by`` (a column or list of columns) to add a third **mix** component. The per-exposure loss
+    is then decomposed into utilization, unit cost, and the effect of the exposure
     composition shifting across the ``mix_by`` cells. Utilization and unit cost are
     measured *within* each cell (free of composition), and mix captures the aggregate
     movement that comes purely from the cell weights changing -- the piece the two-way
     otherwise misattributes to utilization and unit cost. The split uses the LMDI
     (logarithmic mean Divisia index) convention, which is order-free and reconciles
-    exactly: ``pmpm_trend == util_trend * cost_trend * mix_trend`` and
-    ``pmpm_change == util_effect + cost_effect + mix_effect``.
+    exactly: ``loss_per_exposure_trend == util_trend * cost_trend * mix_trend`` and
+    ``loss_per_exposure_change == util_effect + cost_effect + mix_effect``.
 
     A list of columns in ``mix_by`` defines the cells as their cross -- one blended mix
     term, not a per-column attribution; to attribute mix to each dimension separately,
@@ -224,7 +220,7 @@ def decompose_pmpm_trend(
     """
     keys = as_list(on)
     if mix_by is not None:
-        return _decompose_pmpm_trend_mix(
+        return _decompose_per_exposure_trend_mix(
             prior, current,
             count_col=count_col, loss_col=loss_col, exposure_col=exposure_col,
             on=keys, mix_by=mix_by,
@@ -232,13 +228,13 @@ def decompose_pmpm_trend(
 
     p = frequency_severity_summary(
         prior, count_col=count_col, loss_col=loss_col, exposure_col=exposure_col,
-        groupby=on, annualization=annualization,
+        groupby=on,
     )
     c = frequency_severity_summary(
         current, count_col=count_col, loss_col=loss_col, exposure_col=exposure_col,
-        groupby=on, annualization=annualization,
+        groupby=on,
     )
-    keep = ["frequency", "severity", "pmpm"]
+    keep = ["frequency", "severity", "loss_per_exposure"]
     if keys:
         merged = p[keys + keep].merge(c[keys + keep], on=keys, how="outer", suffixes=("_prior", "_current"))
     else:
@@ -250,17 +246,17 @@ def decompose_pmpm_trend(
 
     merged["util_trend"] = safe_divide(merged["frequency_current"], merged["frequency_prior"])
     merged["cost_trend"] = safe_divide(merged["severity_current"], merged["severity_prior"])
-    merged["pmpm_trend"] = safe_divide(merged["pmpm_current"], merged["pmpm_prior"])
+    merged["loss_per_exposure_trend"] = safe_divide(merged["loss_per_exposure_current"], merged["loss_per_exposure_prior"])
 
     freq_mean = (merged["frequency_prior"] + merged["frequency_current"]) / 2
     sev_mean = (merged["severity_prior"] + merged["severity_current"]) / 2
-    merged["pmpm_change"] = merged["pmpm_current"] - merged["pmpm_prior"]
+    merged["loss_per_exposure_change"] = merged["loss_per_exposure_current"] - merged["loss_per_exposure_prior"]
     merged["util_effect"] = (merged["frequency_current"] - merged["frequency_prior"]) * sev_mean
     merged["cost_effect"] = (merged["severity_current"] - merged["severity_prior"]) * freq_mean
 
     ordered = keys + [
-        "pmpm_prior", "pmpm_current", "pmpm_trend", "util_trend", "cost_trend",
-        "pmpm_change", "util_effect", "cost_effect",
+        "loss_per_exposure_prior", "loss_per_exposure_current", "loss_per_exposure_trend", "util_trend", "cost_trend",
+        "loss_per_exposure_change", "util_effect", "cost_effect",
         "frequency_prior", "frequency_current", "severity_prior", "severity_current",
     ]
     return merged[[col for col in ordered if col in merged.columns]]

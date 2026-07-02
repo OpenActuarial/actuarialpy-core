@@ -6,18 +6,8 @@ from collections.abc import Iterable, Sequence
 
 import pandas as pd
 
-from actuarialpy.columns import as_list, sum_columns, validate_columns
+from actuarialpy.columns import as_list, per_exposure_name, sum_columns, validate_columns
 from actuarialpy.metrics import per_exposure, safe_divide
-
-
-def _per_exposure_name(amount_name: str, exposure_col: str) -> str:
-    if exposure_col == "member_months":
-        return f"{amount_name}_pmpm"
-    if exposure_col == "subscriber_months":
-        return f"{amount_name}_pspm"
-    if exposure_col == "employee_months":
-        return f"{amount_name}_pepm"
-    return f"{amount_name}_per_{exposure_col}"
 
 
 def summarize_claimants(
@@ -46,7 +36,7 @@ def summarize_claimants(
     ).sum(numeric_only=True)
     out[amount_name] = sum_columns(out, amounts)
     if exposure_col:
-        out[_per_exposure_name(amount_name, exposure_col)] = per_exposure(out[amount_name], out[exposure_col])
+        out[per_exposure_name(amount_name, exposure_col)] = per_exposure(out[amount_name], out[exposure_col])
     return out
 
 

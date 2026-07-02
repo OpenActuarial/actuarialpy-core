@@ -12,9 +12,9 @@ explicit weight:
     \bar{x}_w = \frac{\sum_i w_i x_i}{\sum_i w_i}.
 
 The weight is a **required** argument everywhere in this module. An
-unweighted mean of rate actions silently equal-weights a 50-life group with
-a 5,000-life group; forcing the caller to name the weight (premium, member
-months, ...) makes that choice visible and reviewable.
+unweighted mean of rate actions silently equal-weights a small risk with a
+large one; forcing the caller to name the weight (premium, exposure, ...)
+makes that choice visible and reviewable.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ def weighted_summary(
     :math:`\\sum wx / \\sum w` per group; the weight total is reported as
     ``{weight_col}_total`` so the base of every average is visible.
 
-    Typical use: premium-weighted rate actions by cohort, member-weighted
+    Typical use: premium-weighted rate actions by cohort, exposure-weighted
     persistency by segment.
     """
     values = as_list(value_cols)

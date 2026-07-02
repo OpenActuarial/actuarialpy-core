@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from actuarialpy.columns import as_list, is_date_like, sum_columns, validate_columns
+from actuarialpy.columns import as_list, is_date_like, per_exposure_name, sum_columns, validate_columns
 from actuarialpy.metrics import loss_ratio, per_exposure
 from actuarialpy.profiles import apply_profile_labels, get_profile_defaults
 
@@ -21,15 +21,6 @@ def _validate_exposures(exposures: list[str]) -> None:
             f"Invalid exposure column(s): {bad}. For member-level monthly data, create a "
             "member_months column equal to 1 and use exposure_cols='member_months'."
         )
-
-
-def _per_exposure_column_names(total_expense_name: str, total_revenue_name: str, exposure: str) -> tuple[str, str]:
-    mapping = {
-        "member_months": ("expense_pmpm", "revenue_pmpm"),
-        "subscriber_months": ("expense_pspm", "revenue_pspm"),
-        "employee_months": ("expense_pepm", "revenue_pepm"),
-    }
-    return mapping.get(exposure, (f"{total_expense_name}_per_{exposure}", f"{total_revenue_name}_per_{exposure}"))
 
 
 def _order_summary_columns(
@@ -126,7 +117,8 @@ def summarize_experience(
     expense_per_names: list[str] = []
     revenue_per_names: list[str] = []
     for exposure in exposures:
-        expense_per, revenue_per = _per_exposure_column_names(total_expense_name, total_revenue_name, exposure)
+        expense_per = per_exposure_name(total_expense_name, exposure)
+        revenue_per = per_exposure_name(total_revenue_name, exposure)
         summary[expense_per] = per_exposure(summary[total_expense_name], summary[exposure])
         summary[revenue_per] = per_exposure(summary[total_revenue_name], summary[exposure])
         expense_per_names.append(expense_per)

@@ -8,18 +8,13 @@ from actuarialpy.metrics import (
     frequency,
     indicated_change,
     loss_ratio,
-    medical_loss_ratio,
-    pepm,
     per_exposure,
     permissible_loss_ratio,
-    pmpm,
-    pspm,
     pure_premium,
     ratio,
     required_revenue,
     safe_divide,
     severity,
-    utilization_per_1000,
 )
 from actuarialpy.reserving import (
     ChainLadder,
@@ -118,7 +113,7 @@ from actuarialpy.trend import (
 )
 from actuarialpy.components import component_driver_analysis, component_trend, summarize_components
 from actuarialpy.cohorts import cohort_summary, cohort_summary_by_period, duration_summary
-from actuarialpy.decomposition import decompose_pmpm_trend, frequency_severity_summary
+from actuarialpy.decomposition import decompose_per_exposure_trend, frequency_severity_summary
 from actuarialpy.seasonality import (
     add_business_days,
     apply_seasonality,
@@ -138,14 +133,9 @@ __all__ = [
     "frequency",
     "indicated_change",
     "loss_ratio",
-    "medical_loss_ratio",
-    "pepm",
     "per_exposure",
     "permissible_loss_ratio",
-    "pmpm",
-    "pspm",
     "pure_premium",
-    "utilization_per_1000",
     "ratio",
     "required_revenue",
     "safe_divide",
@@ -173,7 +163,7 @@ __all__ = [
     "cohort_summary",
     "cohort_summary_by_period",
     "frequency_severity_summary",
-    "decompose_pmpm_trend",
+    "decompose_per_exposure_trend",
     "duration_summary",
     "rolling_summary",
     "annualized_trend",
