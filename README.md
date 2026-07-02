@@ -20,6 +20,7 @@ and `pandas`, and every result is a DataFrame or Series.
 - [Actual versus forecast](#actual-versus-forecast)
 - [Credibility](#credibility)
 - [Lifecycle, pooling, banding, margins](#lifecycle-pooling-banding-margins)
+- [Underwriting summary and weighted rollups](#underwriting-summary-and-weighted-rollups)
 - [Reporting](#reporting)
 
 ## Overview
@@ -391,6 +392,45 @@ directly when EPV and VHM are already known.
 - **Margins** (`margins`): `add_margin(...)` / `margin(...)` / `margin_ratio(...)`.
 - **Contribution** (`contribution`): `share_of_total(...)`, `contribution_to_change(...)`,
   `top_contributors(...)`.
+
+## Underwriting summary and weighted rollups
+
+The two-tier underwriting income statement — **gross margin** (revenue less
+benefit expense, admin excluded, which is also why admin never enters an MLR)
+and **gain/(loss)** (gross margin less admin). Ratio denominators are explicit
+parameters because real exhibits mix them (MCR over net revenue, AER over
+gross premium); `reconciliation()` reports the resulting gap in
+`gain% = 1 − MCR − AER` so the convention is visible instead of silent. These
+are management/pricing metrics; the regulated ACA rebate MLR is out of scope.
+
+```python
+from actuarialpy import UnderwritingSummary, underwriting_summary
+
+uw = UnderwritingSummary.from_pmpm(
+    revenue_pmpm={"premium": 400.0, "refund": -1.4},
+    benefit_pmpm={"medical": 340.0, "pharmacy_net": 16.4},
+    admin_pmpm=37.4,
+    member_months=300_000,
+)
+uw.mcr, uw.aer, uw.gross_margin_pmpm, uw.gain_pmpm, uw.gain_ratio
+
+# grouped: components summed first, every ratio a ratio of sums
+underwriting_summary(df, groupby="cohort",
+                     revenue_cols=["premium", "refund"], benefit_cols=medical_cols,
+                     admin_cols="admin", exposure_col="member_months",
+                     premium_col="premium")
+```
+
+Quantities that are already rates at the row level (rate actions, persistency)
+cannot be summed; `weighted_mean` / `weighted_summary` average them with a
+**required, named weight** and report the weight total beside every average:
+
+```python
+from actuarialpy import weighted_summary
+
+weighted_summary(book, value_cols="rate_action", weight_col="premium",
+                 groupby="cohort")
+```
 
 ## Reporting
 

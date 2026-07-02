@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.35.0
+
+### Added
+
+- `UnderwritingSummary` and `underwriting_summary` in a new `underwriting`
+  module: the two-tier underwriting income statement. Labeled revenue,
+  benefit, and admin components go in; total revenue, total benefit,
+  gross margin (the benefit-tier margin, admin excluded), gain/(loss)
+  (gross margin less admin), MCR, AER, and the margin ratios come out,
+  with PMPM variants when member months are supplied. Ratio denominators
+  are explicit parameters (`"total_revenue"` or `"premium"`) rather than
+  assumptions, because real exhibits mix them -- MCR over net revenue,
+  AER over gross premium -- and `reconciliation()` reports the resulting
+  gap in `gain% = 1 - MCR - AER` so convention drift is visible. The
+  grouped frame version follows the `summarize_experience` contract:
+  components are summed first and every ratio is a ratio of sums.
+  Component labels are the caller's vocabulary; the library only sums
+  them. These are management/pricing metrics -- the ACA rebate MLR is a
+  separate regulated calculation and is documented as out of scope.
+- `weighted_mean` and `weighted_summary` in a new `weighted` module, for
+  quantities that are already rates at the row level (rate actions,
+  persistency, trend assumptions) and therefore cannot be summed. The
+  weight is a required argument everywhere -- an unweighted mean of rate
+  actions silently equal-weights a 50-life group with a 5,000-life group
+  -- and the weight total is reported alongside every grouped average.
+  NaN values propagate by default (`skipna=False`) so missing data
+  surfaces instead of silently shrinking the base.
+
 ## 0.34.0
 
 ### Changed

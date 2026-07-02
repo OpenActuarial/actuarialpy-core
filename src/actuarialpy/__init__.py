@@ -94,6 +94,8 @@ from actuarialpy.banding import assign_band, summarize_by_band
 from actuarialpy.adjustments import adjust
 from actuarialpy.columns import factor_lookup
 from actuarialpy.margins import add_margin, margin, margin_ratio
+from actuarialpy.underwriting import UnderwritingSummary, underwriting_summary
+from actuarialpy.weighted import weighted_mean, weighted_summary
 from actuarialpy.pooling import (
     excess_over_threshold,
     pool_losses,
@@ -207,6 +209,12 @@ __all__ = [
     "add_margin",
     "margin",
     "margin_ratio",
+    # underwriting income statement
+    "UnderwritingSummary",
+    "underwriting_summary",
+    # explicit-weight aggregation
+    "weighted_mean",
+    "weighted_summary",
     # large-loss pooling
     "excess_over_threshold",
     "pool_losses",
